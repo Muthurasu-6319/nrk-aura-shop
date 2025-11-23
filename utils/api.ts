@@ -1,4 +1,4 @@
-// Helper to determine the API URL based on the environment
+export const API_URL = import.meta.env.VITE_API_URL || '/api';// Helper to determine the API URL based on the environment
 export const getApiUrl = () => {
     // If VITE_API_URL is set in .env (e.g., in Vercel), use it.
     if (import.meta.env.VITE_API_URL) {

@@ -839,12 +839,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                                 <input type="text" className="w-full bg-brand-50 border border-brand-200 p-2 rounded text-sm" value={settingsForm.socialInstagram} onChange={e => setSettingsForm({...settingsForm, socialInstagram: e.target.value})} />
                                             </div>
                                             <div className="space-y-1">
-                                                <label className="text-[10px] font-bold uppercase text-gray-400">Facebook URL</label>
+                                                <label className="text-[10px] font-bold uppercase text-gray-400">Youtube URL</label>
                                                 <input type="text" className="w-full bg-brand-50 border border-brand-200 p-2 rounded text-sm" value={settingsForm.socialFacebook} onChange={e => setSettingsForm({...settingsForm, socialFacebook: e.target.value})} />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold uppercase text-gray-400">Pinterest URL</label>
-                                                <input type="text" className="w-full bg-brand-50 border border-brand-200 p-2 rounded text-sm" value={settingsForm.socialPinterest} onChange={e => setSettingsForm({...settingsForm, socialPinterest: e.target.value})} />
                                             </div>
                                         </div>
                                     </div>
