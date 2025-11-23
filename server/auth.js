@@ -17,7 +17,7 @@ app.use(express.json());
 // Vercel handles CORS automatically if configured in vercel.json,
 // but we keep this for local dev and explicit permission.
 app.use(cors({
-    origin: process.env.FRONTEND_URL || '*', // Allow frontend domain
+    origin: process.env.FRONTEND_URL || '*', // Allow frontend domain or ALL for debugging
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
 }));
@@ -48,7 +48,7 @@ const transporter = nodemailer.createTransport({
 const sendEmail = async (to, subject, htmlContent) => {
     try {
         const info = await transporter.sendMail({
-            from: `\"NRK Aura\" <${process.env.EMAIL_USER}>`,
+            from: `"NRK Aura" <${process.env.EMAIL_USER}>`,
             to,
             subject,
             html: htmlContent
@@ -58,6 +58,26 @@ const sendEmail = async (to, subject, htmlContent) => {
         console.error("❌ Email sending failed:", error);
     }
 };
+
+// ==========================================
+// A. VERCEL DEBUGGING ROUTES (NEW)
+// ==========================================
+
+// 1. Simple Server Check
+app.get('/api/hello', (req, res) => {
+    res.json({ message: "Backend is working! 🎉", time: new Date().toISOString() });
+});
+
+// 2. Database Connection Check
+app.get('/api/db-check', async (req, res) => {
+    try {
+        const [rows] = await db.execute('SELECT 1 as val');
+        res.json({ status: "Database Connected 🟢", result: rows });
+    } catch (err) {
+        console.error("DB Check Failed:", err);
+        res.status(500).json({ status: "Database Failed 🔴", error: err.message });
+    }
+});
 
 // ==========================================
 // 1. PAYMENT & ORDER ENDPOINTS
@@ -102,15 +122,14 @@ app.post('/api/orders', async (req, res) => {
     const { id, userId, date, total, paymentMethod, shippingDetails, items } = order;
 
     console.log("📦 Placing Order:", id);
-
     try {
         // 1. Insert into Orders Table
         await db.execute(
             `INSERT INTO orders (
-                id, user_id, order_date, status, total_amount, payment_method, 
-                shipping_name, shipping_email, shipping_address, shipping_city, 
-                shipping_zip, shipping_state, shipping_phone
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            id, user_id, order_date, status, total_amount, payment_method, 
+            shipping_name, shipping_email, shipping_address, shipping_city, 
+            shipping_zip, shipping_state, shipping_phone
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 id, userId, date, 'Pending', total, paymentMethod,
                 `${shippingDetails.firstName} ${shippingDetails.lastName}`,
@@ -123,25 +142,25 @@ app.post('/api/orders', async (req, res) => {
         for (const item of items) {
             await db.execute(
                 `INSERT INTO order_items (order_id, product_id, product_name, quantity, price, image_url) 
-                 VALUES (?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?)`,
                 [id, item.id, item.name, item.quantity, item.price, item.image]
             );
         }
 
         // 3. Send Email to Admin
         const adminHtml = `
-            <h2>New Order Received! 🎉</h2>
-            <p><strong>Order ID:</strong> ${id}</p>
-            <p><strong>Customer:</strong> ${shippingDetails.firstName} ${shippingDetails.lastName}</p>
-            <p><strong>Total:</strong> ₹${total}</p>
-            <p><strong>Payment:</strong> ${paymentMethod}</p>
-            <hr/>
-            <h3>Items:</h3>
-            <ul>
-                ${items.map(i => `<li>${i.name} (x${i.quantity})</li>`).join('')}
-            </ul>
-            <p>Please check the Admin Dashboard to process this order.</p>
-        `;
+        <h2>New Order Received! 🎉</h2>
+        <p><strong>Order ID:</strong> ${id}</p>
+        <p><strong>Customer:</strong> ${shippingDetails.firstName} ${shippingDetails.lastName}</p>
+        <p><strong>Total:</strong> ₹${total}</p>
+        <p><strong>Payment:</strong> ${paymentMethod}</p>
+        <hr/>
+        <h3>Items:</h3>
+        <ul>
+            ${items.map(i => `<li>${i.name} (x${i.quantity})</li>`).join('')}
+        </ul>
+        <p>Please check the Admin Dashboard to process this order.</p>
+    `;
 
         const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
         await sendEmail(adminEmail, `New Order Alert #${id}`, adminHtml);
@@ -208,11 +227,11 @@ app.put('/api/orders/:id/status', async (req, res) => {
         if (orderRows.length > 0) {
             const { shipping_email, shipping_name } = orderRows[0];
             const userHtml = `
-                <h2>Order Status Update 🚚</h2>
-                <p>Hello ${shipping_name},</p>
-                <p>Your order <strong>#${id}</strong> status has been updated to: <span style="color:#065F46; font-weight:bold;">${status}</span>.</p>
-                <p>Thank you for shopping with NRK Aura.</p>
-            `;
+            <h2>Order Status Update 🚚</h2>
+            <p>Hello ${shipping_name},</p>
+            <p>Your order <strong>#${id}</strong> status has been updated to: <span style="color:#065F46; font-weight:bold;">${status}</span>.</p>
+            <p>Thank you for shopping with NRK Aura.</p>
+        `;
             await sendEmail(shipping_email, `Order Update: #${id} is ${status}`, userHtml);
         }
 
@@ -253,25 +272,25 @@ app.post('/api/contact-form', async (req, res) => {
     const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
 
     const emailHtml = `
-        <h2>New Contact Form Message Received 📧</h2>
-        <p>You have received a new message from the contact form.</p>
-        <hr/>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Subject:</strong> ${subject}</p>
-        <h3>Message:</h3>
-        <p style="border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; white-space: pre-wrap;">${message}</p>
-    `;
+    <h2>New Contact Form Message Received 📧</h2>
+    <p>You have received a new message from the contact form.</p>
+    <hr/>
+    <p><strong>Name:</strong> ${name}</p>
+    <p><strong>Email:</strong> ${email}</p>
+    <p><strong>Subject:</strong> ${subject}</p>
+    <h3>Message:</h3>
+    <p style="border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; white-space: pre-wrap;">${message}</p>
+`;
 
     try {
         await sendEmail(adminEmail, `[Contact Form] ${subject} from ${name}`, emailHtml);
 
         const userConfirmationHtml = `
-            <h2>Thank You for Contacting NRK Aura!</h2>
-            <p>Dear ${name},</p>
-            <p>We have successfully received your message regarding: <strong>${subject}</strong>.</p>
-            <p>Our concierge will review your inquiry and aim to respond within 24 hours.</p>
-        `;
+        <h2>Thank You for Contacting NRK Aura!</h2>
+        <p>Dear ${name},</p>
+        <p>We have successfully received your message regarding: <strong>${subject}</strong>.</p>
+        <p>Our concierge will review your inquiry and aim to respond within 24 hours.</p>
+    `;
 
         await sendEmail(email, `Confirmation: Your Message to NRK Aura`, userConfirmationHtml);
 
@@ -633,7 +652,24 @@ app.get('/api/about-content', async (req, res) => {
 app.post('/api/about-content', async (req, res) => {
     const d = req.body;
     try {
-        const query = `INSERT INTO about_content ( id, title, subtitle, hero_image, stat1_value, stat1_label, stat2_value, stat2_label, stat3_value, stat3_label, story_title, story_text, story_image, craftsmanship_title, craftsmanship_text, craftsmanship_video, philosophy_title, philosophy_subtitle, value1_title, value1_desc, value2_title, value2_desc, value3_title, value3_desc, process_title, step1_title, step1_desc, step1_image, step2_title, step2_desc, step2_image, step3_title, step3_desc, step3_image ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title=VALUES(title), subtitle=VALUES(subtitle), hero_image=VALUES(hero_image), stat1_value=VALUES(stat1_value), stat1_label=VALUES(stat1_label), stat2_value=VALUES(stat2_value), stat2_label=VALUES(stat2_label), stat3_value=VALUES(stat3_value), stat3_label=VALUES(stat3_label), story_title=VALUES(story_title), story_text=VALUES(story_text), story_image=VALUES(story_image), craftsmanship_title=VALUES(craftsmanship_title), craftsmanship_text=VALUES(craftsmanship_text), craftsmanship_video=VALUES(craftsmanship_video), philosophy_title=VALUES(philosophy_title), philosophy_subtitle=VALUES(philosophy_subtitle), value1_title=VALUES(value1_title), value1_desc=VALUES(value1_desc), value2_title=VALUES(value2_title), value2_desc=VALUES(value2_desc), value3_title=VALUES(value3_title), value3_desc=VALUES(value3_desc), process_title=VALUES(process_title), step1_title=VALUES(step1_title), step1_desc=VALUES(step1_desc), step1_image=VALUES(step1_image), step2_title=VALUES(step2_title), step2_desc=VALUES(step2_desc), step2_image=VALUES(step2_image), step3_title=VALUES(step3_title), step3_desc=VALUES(step3_desc), step3_image=VALUES(step3_image)`;
+        const query = `INSERT INTO about_content (
+            id, title, subtitle, hero_image, stat1_value, stat1_label, stat2_value, stat2_label, stat3_value, stat3_label, 
+            story_title, story_text, story_image, craftsmanship_title, craftsmanship_text, craftsmanship_video, 
+            philosophy_title, philosophy_subtitle, value1_title, value1_desc, value2_title, value2_desc, value3_title, value3_desc, 
+            process_title, step1_title, step1_desc, step1_image, step2_title, step2_desc, step2_image, step3_title, step3_desc, step3_image 
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+        ON DUPLICATE KEY UPDATE 
+            title=VALUES(title), subtitle=VALUES(subtitle), hero_image=VALUES(hero_image), 
+            stat1_value=VALUES(stat1_value), stat1_label=VALUES(stat1_label), stat2_value=VALUES(stat2_value), stat2_label=VALUES(stat2_label), stat3_value=VALUES(stat3_value), stat3_label=VALUES(stat3_label), 
+            story_title=VALUES(story_title), story_text=VALUES(story_text), story_image=VALUES(story_image), 
+            craftsmanship_title=VALUES(craftsmanship_title), craftsmanship_text=VALUES(craftsmanship_text), craftsmanship_video=VALUES(craftsmanship_video), 
+            philosophy_title=VALUES(philosophy_title), philosophy_subtitle=VALUES(philosophy_subtitle), 
+            value1_title=VALUES(value1_title), value1_desc=VALUES(value1_desc), value2_title=VALUES(value2_title), value2_desc=VALUES(value2_desc), value3_title=VALUES(value3_title), value3_desc=VALUES(value3_desc), 
+            process_title=VALUES(process_title), 
+            step1_title=VALUES(step1_title), step1_desc=VALUES(step1_desc), step1_image=VALUES(step1_image), 
+            step2_title=VALUES(step2_title), step2_desc=VALUES(step2_desc), step2_image=VALUES(step2_image), 
+            step3_title=VALUES(step3_title), step3_desc=VALUES(step3_desc), step3_image=VALUES(step3_image)`;
+
         const values = [
             v(d.title), v(d.subtitle), v(d.heroImage),
             v(d.stat1Value), v(d.stat1Label), v(d.stat2Value), v(d.stat2Label), v(d.stat3Value), v(d.stat3Label),
@@ -695,7 +731,18 @@ app.get('/api/home-content', async (req, res) => {
 app.post('/api/home-content', async (req, res) => {
     const d = req.body;
     try {
-        const query = `INSERT INTO home_content ( id, hero_title, hero_subtitle, hero_image, home_video_url, marquee_text, trends_title, trends_subtitle, trend1_title, trend1_image, trend2_title, trend2_image, video_section_title, video_section_subtitle, featured_title, featured_subtitle, editorial_title, editorial_text, editorial_image, editorial_video ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE hero_title=VALUES(hero_title), hero_subtitle=VALUES(hero_subtitle), hero_image=VALUES(hero_image), home_video_url=VALUES(home_video_url), marquee_text=VALUES(marquee_text), trends_title=VALUES(trends_title), trends_subtitle=VALUES(trends_subtitle), trend1_title=VALUES(trend1_title), trend1_image=VALUES(trend1_image), trend2_title=VALUES(trend2_title), trend2_image=VALUES(trend2_image), video_section_title=VALUES(video_section_title), video_section_subtitle=VALUES(video_section_subtitle), featured_title=VALUES(featured_title), featured_subtitle=VALUES(featured_subtitle), editorial_title=VALUES(editorial_title), editorial_text=VALUES(editorial_text), editorial_image=VALUES(editorial_image), editorial_video=VALUES(editorial_video)`;
+        const query = `INSERT INTO home_content (
+            id, hero_title, hero_subtitle, hero_image, home_video_url, marquee_text, 
+            trends_title, trends_subtitle, trend1_title, trend1_image, trend2_title, trend2_image, 
+            video_section_title, video_section_subtitle, featured_title, featured_subtitle, 
+            editorial_title, editorial_text, editorial_image, editorial_video 
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+        ON DUPLICATE KEY UPDATE 
+            hero_title=VALUES(hero_title), hero_subtitle=VALUES(hero_subtitle), hero_image=VALUES(hero_image), home_video_url=VALUES(home_video_url), marquee_text=VALUES(marquee_text), 
+            trends_title=VALUES(trends_title), trends_subtitle=VALUES(trends_subtitle), trend1_title=VALUES(trend1_title), trend1_image=VALUES(trend1_image), trend2_title=VALUES(trend2_title), trend2_image=VALUES(trend2_image), 
+            video_section_title=VALUES(video_section_title), video_section_subtitle=VALUES(video_section_subtitle), featured_title=VALUES(featured_title), featured_subtitle=VALUES(featured_subtitle), 
+            editorial_title=VALUES(editorial_title), editorial_text=VALUES(editorial_text), editorial_image=VALUES(editorial_image), editorial_video=VALUES(editorial_video)`;
+
         const values = [
             v(d.heroTitle), v(d.heroSubtitle), v(d.heroImage), v(d.homeVideoUrl), v(d.marqueeText),
             v(d.trendsSectionTitle), v(d.trendsSectionSubtitle), v(d.trend1Title), v(d.trend1Image), v(d.trend2Title), v(d.trend2Image),
@@ -745,7 +792,19 @@ app.get('/api/site-settings', async (req, res) => {
 app.post('/api/site-settings', async (req, res) => {
     const d = req.body;
     try {
-        const query = `INSERT INTO site_settings ( id, brand_name, brand_subtitle, logo_url, footer_about_title, footer_about_text, contact_email, social_instagram, social_facebook, social_pinterest, invoice_address, invoice_prefix, order_prefix, logo_height, logo_width ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE brand_name=VALUES(brand_name), brand_subtitle=VALUES(brand_subtitle), logo_url=VALUES(logo_url), footer_about_title=VALUES(footer_about_title), footer_about_text=VALUES(footer_about_text), contact_email=VALUES(contact_email), social_instagram=VALUES(social_instagram), social_facebook=VALUES(social_facebook), social_pinterest=VALUES(social_pinterest), invoice_address=VALUES(invoice_address), invoice_prefix=VALUES(invoice_prefix), order_prefix=VALUES(order_prefix), logo_height=VALUES(logo_height), logo_width=VALUES(logo_width)`;
+        const query = `INSERT INTO site_settings (
+            id, brand_name, brand_subtitle, logo_url, footer_about_title, footer_about_text, 
+            contact_email, social_instagram, social_facebook, social_pinterest, 
+            invoice_address, invoice_prefix, order_prefix, logo_height, logo_width 
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+        ON DUPLICATE KEY UPDATE 
+            brand_name=VALUES(brand_name), brand_subtitle=VALUES(brand_subtitle), logo_url=VALUES(logo_url), 
+            footer_about_title=VALUES(footer_about_title), footer_about_text=VALUES(footer_about_text), 
+            contact_email=VALUES(contact_email), social_instagram=VALUES(social_instagram), 
+            social_facebook=VALUES(social_facebook), social_pinterest=VALUES(social_pinterest), 
+            invoice_address=VALUES(invoice_address), invoice_prefix=VALUES(invoice_prefix), 
+            order_prefix=VALUES(order_prefix), logo_height=VALUES(logo_height), logo_width=VALUES(logo_width)`;
+
         const values = [
             v(d.brandName), v(d.brandSubtitle), v(d.logoUrl),
             v(d.footerAboutTitle), v(d.footerAboutText), v(d.contactEmail),
