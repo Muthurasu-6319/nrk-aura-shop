@@ -1,0 +1,16 @@
+{
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/index.html"
+        }
+    ],
+    "buildCommand": "npm run build",
+    "outputDirectory": "dist",
+    "framework": "vite",
+    "functions": {
+        "server/auth.js": {
+            "maxDuration": 10
+        }
+    }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "NRK Aura Luxury Bangles",
+  "description": "An advanced luxury e-commerce boutique for NRK Aura Bangles featuring AI styling advice and virtual try-on.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
